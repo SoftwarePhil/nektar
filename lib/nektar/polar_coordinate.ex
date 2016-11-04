@@ -23,6 +23,7 @@ defmodule Nektar.PolarCoordinate do
                         {_, y} when y < 0 ->            angle + 90  #{ x ,-y}
                         {_, _}            ->            angle       #{ x , y}
                   end
+        
         {result, length}
     end
 
@@ -49,8 +50,6 @@ defmodule Nektar.PolarCoordinate do
     """
     def relative_coordinates({x,y}, other_positions) do
         Enum.map(other_positions, fn({other_x, other_y}) -> {other_x - x, other_y - y} end)
-        |>Enum.map(fn(angle) -> 
-                find_angle(angle)
-            end)
+        |>Enum.map(fn(angle) -> find_angle(angle) end)
     end
 end
