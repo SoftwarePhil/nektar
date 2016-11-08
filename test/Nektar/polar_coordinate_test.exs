@@ -3,33 +3,39 @@ defmodule Nektar.PolarCoordinateTest do
     alias Nektar.PolarCoordinate, as: Polar
 
     test "the correct angle is being found" do
-        {angle, _length} = Polar.find_angle({1,0})
-        assert Float.round(angle)  == 0
+        pc = Polar.create_polarcoordinate({1,0})
+        assert Float.round(pc.theta)  == 0
         
-        {angle, _length} = Polar.find_angle({1,1})
-        assert Float.round(angle)  == 45
+        pc = Polar.create_polarcoordinate({1,1})
+        assert Float.round(pc.theta)  == 45
      
-        {angle, _length} = Polar.find_angle({0,1})
-        assert Float.round(angle)  == 90
+        pc = Polar.create_polarcoordinate({0,1})
+        assert Float.round(pc.theta)  == 90
 
-        {angle, _length} = Polar.find_angle({0,-1})
-        assert Float.round(angle)  == 180
+        pc = Polar.create_polarcoordinate({0,-1})
+        assert Float.round(pc.theta)  == 180
        
-        {angle, _length} = Polar.find_angle({-1,-1})
-        assert Float.round(angle)  == 315
+        pc = Polar.create_polarcoordinate({-1,-1})
+        assert Float.round(pc.theta)  == 225
         
-        {angle, _length} = Polar.find_angle({-1,0})
-        assert Float.round(angle)  == 270
+        pc = Polar.create_polarcoordinate({-1,0})
+        assert Float.round(pc.theta)  == 270
 
-        {angle, _length} = Polar.find_angle({1000,1000})
-        assert Float.round(angle)  == 45
+        pc = Polar.create_polarcoordinate({1000,1000})
+        assert Float.round(pc.theta)  == 45
         
-        {angle, _length} = Polar.find_angle({1000000000,1000000000})
-        assert Float.round(angle)  == 45
+        pc = Polar.create_polarcoordinate({1000000000,1000000000})
+        assert Float.round(pc.theta)  == 45
     end
 
-    test "relative coordinates" do
-        list = Polar.relative_coordinates({5,5}, [{6,6}, {0,0}, {7,7}])
-        assert list == [{1, 1}, {-5, -5}, {2, 2}]
+    test "relative coordinates and cartesian coordinates" do
+        result = Polar.relative_coordinates([{6,6}, {0,0}, {7,7}], {5,5})
+                 |>Enum.map(fn(pc) -> 
+                    {x, y} = Polar.as_cartesian(pc)
+                    {Float.round(x), Float.round(y)}
+                    end)
+        
+        IO.inspect Polar.relative_coordinates([{6,6}, {0,0}, {7,7}], {5,5})
+        assert result == [{1.0, 1.0}, {-5.0, -5.0}, {2.0, 2.0}]
     end
 end

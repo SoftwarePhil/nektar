@@ -1,8 +1,13 @@
 defmodule Nektar.Cog do
     alias Nektar.PolarCoordinate, as: Polar
+    alias Nektar.CogServer, as: Server
     @enforce_keys [:id, :x, :y, :theta, :state, :pid]
     defstruct [:id, :x, :y, :theta, :state, :pid]
     
+    @doc """
+        creates a new cog with the following
+        takes in pid (the pid of the server), id (unique cog id), x (x position), y (y postion)
+    """
     def init(other_pid, id, x, y) do
         pid = spawn(__MODULE__, :spin, [id, other_pid])
         %__MODULE__{id: id, x: x, y: y, theta: 0, state: [], pid: pid}
@@ -18,7 +23,6 @@ defmodule Nektar.Cog do
     """
     def update_postion(cog = %__MODULE__{}, pc = %Polar{}) do
         {x, y} = Polar.as_cartesian pc
-
         
         new_theta = case {cog.theta, pc.theta} do
                      {theta, delta} when theta + delta > 359 -> theta + delta - 359
@@ -30,11 +34,13 @@ defmodule Nektar.Cog do
     
     def spin(id, pid) do
         receive do
-            :id        -> send pid, id
+            :id              -> send pid, id
             {:new, postions} -> 
-                delta = behavior(postions)
-                send pid, {:update, delta}
+                behavior(postions)
+                |>Server.update(id)
+                
         end
+        spin(id, pid)
     end
 
     def behavior(postions) do
@@ -45,29 +51,3 @@ defmodule Nektar.Cog do
         |>(fn({angle_sum, _distance_sum, count}) -> %Polar{r: 1, theta: angle_sum/count} end).()
     end
 end
-
-#:TODO 
-#1. give cog actually good 'swarm' behavior, 
-#2. figure out how to make behaviors more flexable ..
-#3. think how to represent the space they will acutally be in 
-
-#make a cog
-cog = Nektar.Cog.init(self, 1, 0, 0)
-
-others_pos = [{1,1}, {5,5}, {-1, -3}]
-polar_coordinates = Nektar.PolarCoordinate.relative_coordinates(Nektar.Cog.postion(cog), others_pos)
-
-#send new postions to cog
-send cog.pid, {:new, polar_coordinates}
-
-#get new polar coordinate, which represents the change of
-#postion of the cog
-answer = receive do
-            {:update, delta} -> delta
-        end
-
-#update cog postion 
-new_pos_cog = Nektar.Cog.update_postion(cog, answer)
-
-IO.inspect cog
-IO.inspect new_pos_cog

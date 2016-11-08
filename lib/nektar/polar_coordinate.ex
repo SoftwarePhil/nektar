@@ -24,10 +24,10 @@ defmodule Nektar.PolarCoordinate do
                 |>to_degrees
         #above finds smallest angle, we want the 'whole' angle    
         final_angle =  case  {x, y} do
-                        {x, y} when x < 0 and y < 0 ->  angle + 180 #{-x , y}
-                        {x, _} when x < 0 ->            angle + 90  #{-x , y}
-                        {_, y} when y < 0 ->            angle + 90  #{ x ,-y}
-                        {_, _}            ->            angle       #{ x , y}
+                        {x, y} when x >= 0 and y >= 0 -> angle      #{ x ,  y}
+                        {_, _}            ->             angle + 90 #{ x ,  y}
+                                                                    #{-x ,  y}
+                                                                    #{ x , -y}
                   end
         
         %__MODULE__{r: length, theta: final_angle}
@@ -58,7 +58,7 @@ defmodule Nektar.PolarCoordinate do
             if postion is {5,5} and others are [{6,6}, {0,0}, {7,7}]
             then this will return [{1,1}, {-5,-5}, {2,2}]
     """
-    def relative_coordinates({x,y}, other_positions) do
+    def relative_coordinates(other_positions, {x, y}) do
         Enum.map(other_positions, fn({other_x, other_y}) -> {other_x - x, other_y - y} end)
         |>Enum.map(fn(angle) -> create_polarcoordinate(angle) end)
     end
@@ -76,7 +76,7 @@ defmodule Nektar.PolarCoordinate do
         case {x, y} do
                 {x, _y} when abs(x) < 0.001  -> {0, pc.r}
                 {_x, y} when abs(y) < 0.001  -> {pc.r, 0}
-                {x, y}                      -> {x, y} 
+                {x, y}                       -> {x, y} 
         end
     end
 end
