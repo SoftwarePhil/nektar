@@ -76,7 +76,17 @@ defmodule Nektar.PolarCoordinate do
         case {x, y} do
                 {x, _y} when abs(x) < 0.001  -> {0, pc.r}
                 {_x, y} when abs(y) < 0.001  -> {pc.r, 0}
-                {x, y}                       -> {x, y} 
+                {x,  y}                      -> {x, y} 
         end
+    end
+
+    def angle({x,y}) do
+        x/:math.sqrt((x*x) + (y*y))
+        |>:math.acos
+        |>to_degrees
+    end
+
+    def add({x,y}, {x2,y2}) do
+        {x+x2, y+y2}
     end
 end

@@ -8,7 +8,7 @@ defmodule Nektar.CogServer do
         {:reply, :ok, {[cog | cog_list], count}}
     end
 
-    def handle_call(:get_list, _from, {cog_list, count}) do
+    def handle_call(:list, _from, {cog_list, count}) do
         {:reply, cog_list, {cog_list, count}}
     end
 
@@ -41,9 +41,11 @@ defmodule Nektar.CogServer do
         
         #this should send a message with the postion of the other cogs around it,
         #making, which should continually send messages to the spin process
-        Enum.each(__MODULE__.cog_list, 
+        #it is sending it's own positon thought, maybe this is okay because
+        #there postion is 0,0
+        Enum.each(__MODULE__.list, 
                   fn(cog) -> 
-                        send cog.pid, {:new, __MODULE__.relative_polarcoordinates(__MODULE__.cog_list, cog)} 
+                        send cog.pid, {:new, __MODULE__.relative_polarcoordinates(__MODULE__.list, cog)} 
                   end)
     end
     
@@ -74,7 +76,7 @@ defmodule Nektar.CogServer do
         :ok = GenServer.call(@name, {:add_cog, cog})
     end
 
-    def cog_list do
+    def list do
         GenServer.call(@name, :get_list)
     end
 
@@ -89,6 +91,8 @@ end
 #3. think how to represent the space they will acutally be in 
 #4. sync all Cogs?  some move more, not sure how big of a deal this is?
     #they seem to be moving super fast, 100s per second
+#7. Environment
+#6. distrubed like gameOfLife example?
 """
 Nektar.CogServer.start_link 4
 list = Nektar.CogServer.cog_list 
