@@ -80,6 +80,17 @@ defmodule Nektar.CogServer do
     def update(delta, id) do
         GenServer.call(@name, {:update, id, delta})
     end
+
+    def write_to_file do
+        {:ok, file} = File.open "points.txt", [:write]
+        
+       point_str = Enum.reduce(list, "",
+                        fn (%Cog{x: x, y: y}, acc) -> acc<>"#{x}\t#{y}\n"
+                   end)
+        
+        IO.binwrite file, point_str
+        
+    end
 end
 
 #:TODO 
