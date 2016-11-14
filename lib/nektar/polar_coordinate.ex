@@ -17,17 +17,22 @@ defmodule Nektar.PolarCoordinate do
     @enforce_keys [:r, :theta]
     defstruct [:r, :theta]
 
+    #zero distance case
+    def create_polarcoordinate({x, y}) when x == 0 and y == 0 do
+        %__MODULE__{r: 0, theta: 0}
+    end
+    
     def create_polarcoordinate({x, y}) do
         {_, length} = normalize({x, y}) 
         
-        angle = :math.acos(x/length)
+        angle = :math.acos(y/length)
                 |>to_degrees
         #above finds smallest angle, we want the 'whole' angle    
         final_angle =  case  {x, y} do
-                        {x, y} when x >= 0 and y >= 0 -> angle      #{ x ,  y}
-                        {_, _}            ->             angle + 90 #{ x ,  y}
-                                                                    #{-x ,  y}
-                                                                    #{ x , -y}
+                        {x, y} when x >= 0 and y >= 0 -> angle       #{ x ,  y}
+                        {x, y} when y <  0 and x >= 0 -> angle       #{ x , -y}
+                        {_, _}                        -> 360 - angle #{-x ,  y}
+                                                                     #{-x , -y}
                   end
         
         %__MODULE__{r: length, theta: final_angle}
@@ -55,12 +60,24 @@ defmodule Nektar.PolarCoordinate do
     @doc """
         finds the relative postion of others 
         ie 
-            if postion is {5,5} and others are [{6,6}, {0,0}, {7,7}]
+            if postion is {5,5}, and angle is 0 and others are [{6,6}, {0,0}, {7,7}]
             then this will return [{1,1}, {-5,-5}, {2,2}]
+
+            this takes postion and angle to get realtive angle also
+            TODO: change to just take a polarcoordinate maybe?
     """
-    def relative_coordinates(other_positions, {x, y}) do
-        Enum.map(other_positions, fn({other_x, other_y}) -> {other_x - x, other_y - y} end)
-        |>Enum.map(fn(angle) -> create_polarcoordinate(angle) end)
+    def relative_coordinates(other_positions, {{x, y}, current_angle}) do
+            Enum.map(other_positions, fn({other_x, other_y}) -> {other_x - x, other_y - y} end)
+            |>Enum.map(fn(x_y)-> 
+                    pc = create_polarcoordinate(x_y)
+
+                    angle = case pc.theta do
+                                angle when current_angle + angle > 359 -> (current_angle + angle) - 360
+                                angle                                  ->  current_angle + angle
+                            end 
+                    
+                    %__MODULE__{r: pc.r, theta: angle}
+                end)        
     end
 
     @doc """
@@ -74,16 +91,15 @@ defmodule Nektar.PolarCoordinate do
         y = pc.r*:math.cos(to_rad(pc.theta))
         
         case {x, y} do
-                {x, _y} when abs(x) < 0.001  -> {0, pc.r}
-                {_x, y} when abs(y) < 0.001  -> {pc.r, 0}
+                {x, _y} when abs(x) < 0.001  -> {0, y}
+                {_x, y} when abs(y) < 0.001  -> {x, 0}
                 {x,  y}                      -> {x, y} 
         end
     end
 
     def angle({x,y}) do
-        x/:math.sqrt((x*x) + (y*y))
-        |>:math.acos
-        |>to_degrees
+       pc = create_polarcoordinate {x,y}
+       pc.theta
     end
 
     def add({x,y}, {x2,y2}) do

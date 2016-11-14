@@ -22,12 +22,13 @@ defmodule Nektar.Cog do
         and returns a cog with a new postion and angle
 
         TODO: think of new name for this function
+        TODO: this crashes when a cog is send the same postion is is already in
     """
     def update_postion(cog = %__MODULE__{}, pc = %Polar{}) do
         {x, y} = Polar.as_cartesian pc
         
         new_theta = case {cog.theta, pc.theta} do
-                     {theta, delta} when theta + delta > 359 -> theta + delta - 359
+                     {theta, delta} when theta + delta > 359 -> theta + delta - 360
                      {theta, delta}                   -> theta + delta  
                     end
         
@@ -59,7 +60,7 @@ defmodule Nektar.Cog do
     end
 
     #swarm parameters
-    @l 0.99
+    @l 0.9
     @alpha 1 - @l
     @x :math.sqrt @l/@alpha
 
@@ -71,17 +72,22 @@ defmodule Nektar.Cog do
         curve(polar_list, [], [])
     end
     
+    #attraction
     defp curve([pc = %Polar{r: r} | polar_list], a_acc, r_acc) when r >= @x do
         curve(polar_list, [pc] ++ a_acc, r_acc)
     end
 
     #repulsion 
-    defp curve([pc = %Polar{r: r} | polar_list], a_acc, r_acc) when r < @x do
+    defp curve([pc = %Polar{r: r} | polar_list], a_acc, r_acc) when r < @x and r > 0 do
         curve(polar_list, a_acc, [pc] ++ r_acc)
     end
 
+    #repulsion, 0 distance case
+    defp curve([%Polar{r: r} | polar_list], a_acc, r_acc) when r == 0 do
+        curve(polar_list, a_acc, [%Polar{r: 0.01, theta: Enum.random(0..359)}] ++ r_acc)
+    end
+
     #apply curve based on r, get and get scalling value, this is a way of weighing the vectors
-    #TODO: test, seems like PolarCoordinate.angle function is not working right
     defp curve([], a_acc, r_acc) do
         a_vector = a_acc
                    |>Enum.reduce({0,0}, fn(pc = %Polar{}, acc) -> 
@@ -99,6 +105,7 @@ defmodule Nektar.Cog do
         
         Polar.add(a_vector, r_vector)
         |>Polar.angle
+
     end 
 
  

@@ -15,9 +15,15 @@ defmodule Nektar.CogServer do
     @doc """
         this function takes the id of a Cog, updates it's postion with
         the delta value and sends back the other postions of the cogs
-        around it 
+        around it
+        TODO: sync cogs so they all have the same amount of updates 
     """
     def handle_call({:update, id, delta}, _from, {cog_list, count}) do
+         #can this be more efficent, I am going through the whole list to update on postion,
+         #the relative_polarcoordinate function goes through this same list and returns
+         #all the other cogs, the cog list is than made into a relative polarcoodinates
+         #in the relative coordinates function, this prolly can be moved to this module maybe?
+         #either way we are going through the same list 3 times, it only needs to happen once 
          {new_cog_list, cog} = Enum.map_reduce(cog_list, {}, fn(is_cog?, acc) -> 
                             case is_cog? do
                                 %Cog{id: this_id} when this_id == id -> 
@@ -26,14 +32,14 @@ defmodule Nektar.CogServer do
                             end
                         end)
             #sending cog others postion after it's own postion is updated            
-            send cog.pid, {:new, __MODULE__.relative_polarcoordinates(new_cog_list, cog)}
-            {:reply, __MODULE__.relative_polarcoordinates(new_cog_list, cog), {new_cog_list, count + 1}}
+            send cog.pid, {:new, relative_polarcoordinates(new_cog_list, cog)}
+            {:reply, relative_polarcoordinates(new_cog_list, cog), {new_cog_list, count + 1}}
     end
 
     def start_link(number_of_cogs) do
         pid = GenServer.start_link(__MODULE__, {[], 0}, name: @name)
 
-        0..number_of_cogs
+        1..number_of_cogs
         |>Enum.each(fn(n) -> 
                         Cog.init(pid, n, 0, n)
                         |>__MODULE__.add_cog
@@ -48,16 +54,7 @@ defmodule Nektar.CogServer do
                         send cog.pid, {:new, __MODULE__.relative_polarcoordinates(__MODULE__.list, cog)} 
                   end)
     end
-    
-    @doc """
-        This function returns all the other cogs who are not the cog passed in
-        ie
-            [cog1, cog2, cog3], cog3
-            returns [cog1, cog2] 
-    """
-    def other_cogs(cog_list, cog) do
-        Enum.reject(cog_list, fn(other_cog = %Cog{}) -> cog.id == other_cog.id end)
-    end
+
 
     @doc """
         this function given a cog list and a cog, returns the relative polar coordinates
@@ -68,7 +65,7 @@ defmodule Nektar.CogServer do
         other_pos = Enum.reject(cog_list, 
                         fn(other_cog = %Cog{}) -> cog.id == other_cog.id end)
                     |>Enum.map(fn(some_cog) -> Cog.postion(some_cog) end)
-                    |>Polar.relative_coordinates({cog.x, cog.y})
+                    |>Polar.relative_coordinates({{cog.x, cog.y}, cog.theta})
         other_pos
     end
 
@@ -77,7 +74,7 @@ defmodule Nektar.CogServer do
     end
 
     def list do
-        GenServer.call(@name, :get_list)
+        GenServer.call(@name, :list)
     end
 
     def update(delta, id) do
