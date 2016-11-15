@@ -47,4 +47,24 @@ defmodule Nektar.PolarCoordinateTest do
         assert new_cog2 == %Cog{id: 1, x: 0, y: 10, theta: 180.0, state: [], pid: 0}
     end
 
+    test "realtive polar coordinates angle test" do
+        cog1 = %Cog{id: 0, x: 0, y: 0, theta: 180, state: [], pid: 0}
+        cog2 = %Cog{id: 1, x: 0, y: 3, theta: 0, state: [], pid: 0}
+
+        list = [cog1, cog2]
+        relative_other_polarcoordinates = Server.relative_polarcoordinates(list, cog1)
+        assert [%Polar{r: 2, theta: 180}] == relative_other_polarcoordinates
+        new_cog1 = Cog.update_postion(cog1, Cog.behavior(relative_other_polarcoordinates))
+
+        assert new_cog1 == %Cog{id: 0, x: 0, y: 0, theta: 180, state: [], pid: 0}
+
+        list2 = [new_cog1, cog2]
+        relative_other_polarcoordinates2 = Server.relative_polarcoordinates(list2, new_cog1)
+        assert [%Polar{r: 2, theta: 180}] == relative_other_polarcoordinates2
+        new2_cog1 = Cog.update_postion(new_cog1, Cog.behavior(relative_other_polarcoordinates2))
+
+        assert new2_cog1 == %Cog{id: 0, x: 0, y: -1, theta: 180, state: [], pid: 0}
+
+    end
+
 end

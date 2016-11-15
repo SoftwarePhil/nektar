@@ -28,13 +28,13 @@ defmodule Nektar.PolarCoordinate do
         angle = :math.acos(y/length)
                 |>to_degrees
         #above finds smallest angle, we want the 'whole' angle    
-        final_angle =  case  {x, y} do
+       
+       final_angle =  case  {x, y} do
                         {x, y} when x >= 0 and y >= 0 -> angle       #{ x ,  y}
                         {x, y} when y <  0 and x >= 0 -> angle       #{ x , -y}
                         {_, _}                        -> 360 - angle #{-x ,  y}
                                                                      #{-x , -y}
-                  end
-        
+                  end      
         %__MODULE__{r: length, theta: final_angle}
     end
 
@@ -72,8 +72,8 @@ defmodule Nektar.PolarCoordinate do
                     pc = create_polarcoordinate(x_y)
 
                     angle = case pc.theta do
-                                angle when current_angle + angle > 359 -> (current_angle + angle) - 360
-                                angle                                  ->  current_angle + angle
+                                angle when current_angle - angle < 0 -> (current_angle - angle) + 360
+                                angle                                ->  current_angle - angle
                             end 
                     
                     %__MODULE__{r: pc.r, theta: angle}

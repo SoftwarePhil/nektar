@@ -3,13 +3,14 @@ defmodule Nektar.Cog do
     alias Nektar.CogServer, as: Server
     @enforce_keys [:id, :x, :y, :theta, :state, :pid]
     defstruct [:id, :x, :y, :theta, :state, :pid]
+    #require IEx
     
     @doc """
         creates a new cog with the following
         takes in pid (the pid of the server), id (unique cog id), x (x position), y (y postion)
     """
     def init(other_pid, id, x, y) do
-        pid = spawn(__MODULE__, :spin, [id, other_pid])
+        pid = spawn(__MODULE__, :spin, [id, other_pid, {}])
         %__MODULE__{id: id, x: x, y: y, theta: 0, state: [], pid: pid}
     end
 
@@ -22,28 +23,39 @@ defmodule Nektar.Cog do
         and returns a cog with a new postion and angle
 
         TODO: think of new name for this function
-        TODO: this crashes when a cog is send the same postion is is already in
+        TODO: when we have a negative x or y. . .
     """
     def update_postion(cog = %__MODULE__{}, pc = %Polar{}) do
-        {x, y} = Polar.as_cartesian pc
         
         new_theta = case {cog.theta, pc.theta} do
                      {theta, delta} when theta + delta > 359 -> theta + delta - 360
-                     {theta, delta}                   -> theta + delta  
+                     {theta, delta}                          -> theta + delta  
                     end
+        {x, y} = Polar.as_cartesian %Polar{pc | theta: new_theta}
         
         %__MODULE__{cog | x: cog.x + x, y: cog.y + y, theta: new_theta}
     end
     
-    def spin(id, pid) do
+    def spin(id, pid, delta, count \\0) do
         receive do
-            :id              -> send pid, id
+            {:count, sender} -> 
+                send sender, count
+                spin(id, pid, delta, count)
             {:new, postions} -> 
-                behavior(postions)
-                |>Server.update(id)
+                #IO.inspect {id, postions}
+                #IEx.pry
+                Server.sync
+                spin(id, pid, behavior(postions), count)
+            :done -> 
+                #IO.puts "#{id} will move"
+                Server.update(delta, id)
+
+                 %Polar{r: r, theta: theta} = delta   
+                 #store cog in ets table
+                #:ets.insert(:history, {"cog#{id}", "id: #{id} \t r: #{r} \t theta: #{theta}\n"})
+                spin(id, pid, {}, count + 1)
                 
         end
-        spin(id, pid)
     end
 
     @doc """
@@ -60,9 +72,9 @@ defmodule Nektar.Cog do
     end
 
     #swarm parameters
-    @l 0.9
+    @l 0.99
     @alpha 1 - @l
-    @x :math.sqrt @l/@alpha
+    @x :math.sqrt(@l/@alpha)
 
     @doc """
         the curve function takes a list of PolarCoordinates and outputs
