@@ -42,19 +42,14 @@ defmodule Nektar.Cog do
                 send sender, count
                 spin(id, pid, delta, count)
             {:new, postions} -> 
-                #IO.inspect {id, postions}
-                #IEx.pry
                 Server.sync
                 spin(id, pid, behavior(postions), count)
             :done -> 
-                #IO.puts "#{id} will move"
                 Server.update(delta, id)
-
-                 %Polar{r: r, theta: theta} = delta   
-                 #store cog in ets table
-                #:ets.insert(:history, {"cog#{id}", "id: #{id} \t r: #{r} \t theta: #{theta}\n"})
+                %Polar{r: r, theta: theta} = delta   
                 spin(id, pid, {}, count + 1)
-                
+            :shutdown ->
+                Process.exit self, "shutdown message received" 
         end
     end
 

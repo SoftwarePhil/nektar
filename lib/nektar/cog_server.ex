@@ -4,6 +4,8 @@ defmodule Nektar.CogServer do
     alias Nektar.PolarCoordinate, as: Polar
     @name {:global, __MODULE__}
 
+    require IEx
+
     def handle_call({:add_cog, cog = %Cog{}}, _from , {cog_list, count, size, num_done}) do
         {:reply, :ok, {[cog | cog_list], count, size + 1, num_done}}
     end
@@ -16,7 +18,7 @@ defmodule Nektar.CogServer do
         this function takes the id of a Cog, updates it's postion with
         the delta value and sends back the other postions of the cogs
         around it
-        TODO: sync cogs so they all have the same amount of updates 
+        TODO: seprate the update from sending new postions so that this only happens after all updates are done   
     """
     def handle_call({:update, id, delta}, _from, {cog_list, count, size, num_done}) do
          #can this be more efficent, I am going through the whole list to update on postion,
@@ -27,24 +29,25 @@ defmodule Nektar.CogServer do
          {new_cog_list, cog} = Enum.map_reduce(cog_list, {}, fn(is_cog?, acc) -> 
                             case is_cog? do
                                 %Cog{id: this_id} when this_id == id -> 
-                                    {Cog.update_postion(is_cog?, delta), is_cog?}
+                                    {Cog.update_postion(is_cog?, delta), Cog.update_postion(is_cog?, delta)}
                                 _-> {is_cog?, acc}
                             end
                         end)
             #sending cog others postion after it's own postion is updated            
-            send cog.pid, {:new, relative_polarcoordinates(new_cog_list, cog)}
+            rc = relative_polarcoordinates(new_cog_list, cog)
+            send cog.pid, {:new, rc}
 
             #store cog in ets table
-            :ets.insert(:history, {"cog#{cog.id}", "id: #{cog.id} \t count: #{count} \t x: #{cog.x} \t y: #{cog.y} \t angle: #{cog.theta}\n"})
+            :ets.insert(:history, {"cog#{cog.id}", "id: #{cog.id} \t count: #{count} \t x: #{cog.x} \t y: #{cog.y} \t angle: #{cog.theta} \t delta: #{inspect(delta)} \t others: #{inspect(rc)}\n"})
             {:reply, [], {new_cog_list, count, size, num_done}}
     end
 
     def handle_call(:sync, _from, {cog_list, count, size, num_done}) do
          if size == num_done + 1 do
                 Enum.each(cog_list, fn(cog = %Cog{}) -> send cog.pid, :done end)
-                {:reply, [], {cog_list, count, size, 0}}
+                {:reply, [], {cog_list, count + 1, size, 0}}
         else
-            {:reply, [], {cog_list, count + 1, size, num_done + 1}}
+            {:reply, [], {cog_list, count, size, num_done + 1}}
         end
     end
 
@@ -65,7 +68,7 @@ defmodule Nektar.CogServer do
        
         Enum.each(list, 
                   fn(cog) -> 
-                        send cog.pid, {:new, __MODULE__.relative_polarcoordinates(list, cog)}
+                        send cog.pid, {:new, relative_polarcoordinates(list, cog)}
                   end)
     end
 
@@ -73,13 +76,17 @@ defmodule Nektar.CogServer do
         this function given a cog list and a cog, returns the relative polar coordinates
         of the other cogs around it.  This list of polar coordinates needs to be sent to
         a cog for it to caculaute how much it is going to move
+        
+        problem is cog and cog in cog list are not the same! ##FIXED
     """
      def relative_polarcoordinates(cog_list, cog) do
         other_pos = Enum.reject(cog_list, 
-                        fn(other_cog = %Cog{}) -> cog.id == other_cog.id end)
+                        fn(%Cog{id: other_id}) -> cog.id == other_id end)
                     |>Enum.map(fn(some_cog) -> Cog.postion(some_cog) end)
                     |>Polar.relative_coordinates({{cog.x, cog.y}, cog.theta})
-        other_pos
+        s = other_pos
+        #IEx.pry
+        s
     end
 
     def add_cog(cog = %Cog{}) do
