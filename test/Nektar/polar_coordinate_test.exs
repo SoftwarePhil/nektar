@@ -63,7 +63,7 @@ defmodule Nektar.PolarCoordinateTest do
         new_cog2 = Cog.update_postion(cog2, Cog.behavior(relative_other_polarcoordinates_2))
 
         assert new_cog1 == %Cog{id: 1, x: 0, y: 0.0, theta: 180, state: [], pid: 0}
-        assert new_cog2 == %Cog{id: 2, x: 0, y: 3.0, theta: 0, state: [], pid: 0}
+        assert new_cog2 == %Cog{id: 2, x: 0, y: 3.0, theta: 360, state: [], pid: 0}
        
         # count 2
         list2 = [new_cog1, new_cog2]
@@ -76,10 +76,7 @@ defmodule Nektar.PolarCoordinateTest do
         new2_cog2 = Cog.update_postion(new_cog2, Cog.behavior(relative_other_polarcoordinates2_2))
 
         assert new2_cog1 == %Cog{id: 1, x: 0, y: -1, theta: 180, state: [], pid: 0}
-        assert new2_cog2 == %Cog{id: 2, x: 0, y: 4.0, theta: 0, state: [], pid: 0}
-
-
-
+        assert new2_cog2 == %Cog{id: 2, x: 0, y: 4.0, theta: 360, state: [], pid: 0}
     end
 
 end

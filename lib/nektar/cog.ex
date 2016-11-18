@@ -3,11 +3,12 @@ defmodule Nektar.Cog do
     alias Nektar.CogServer, as: Server
     @enforce_keys [:id, :x, :y, :theta, :state, :pid]
     defstruct [:id, :x, :y, :theta, :state, :pid]
-    #require IEx
+    require IEx
     
     @doc """
-        creates a new cog with the following
+        creates a new cog
         takes in pid (the pid of the server), id (unique cog id), x (x position), y (y postion)
+        CogServer will not always have global name
     """
     def init(other_pid, id, x, y) do
         pid = spawn(__MODULE__, :spin, [id, other_pid, {}])
@@ -23,17 +24,30 @@ defmodule Nektar.Cog do
         and returns a cog with a new postion and angle
 
         TODO: think of new name for this function
-        TODO: when we have a negative x or y. . .
     """
     def update_postion(cog = %__MODULE__{}, pc = %Polar{}) do
         
-        new_theta = case {cog.theta, pc.theta} do
-                     {theta, delta} when theta + delta > 359 -> theta + delta - 360
-                     {theta, delta}                          -> theta + delta  
-                    end
-        {x, y} = Polar.as_cartesian %Polar{pc | theta: new_theta}
+        #the new angle has to be converted into absolute terms ..
+        #maybe this should happen sooner, ie we have on angle for its
+        #'absolute angle', another for it's 'relative angle' and
+        #another one for when we need to calculate the new direction
+       
+        stored_theta = 
+            case {cog.theta, pc.theta} do
+                {current, delta} when current + delta > 360 -> (current + delta) - 360
+                {current, delta}                            ->  current + delta
+            end 
         
-        %__MODULE__{cog | x: cog.x + x, y: cog.y + y, theta: new_theta}
+        new_theta = 
+                case stored_theta do
+                        angle when angle <  90  -> 90 - angle
+                        angle when angle <  180 -> 360 - (angle - 90)
+                        angle when angle <  270 -> 180 + (90 - (angle - 180))
+                        angle when angle <= 360 -> 90 + (90 - (angle - 270)) 
+                    end
+        {x, y} = Polar.as_cartesian_correct %Polar{pc | theta: new_theta}
+        
+        %__MODULE__{cog | x: cog.x + x, y: cog.y + y, theta: stored_theta}
     end
     
     def spin(id, pid, delta, count \\0) do
@@ -41,12 +55,11 @@ defmodule Nektar.Cog do
             {:count, sender} -> 
                 send sender, count
                 spin(id, pid, delta, count)
-            {:new, postions} -> 
-                Server.sync
+            {:new_postions, postions} -> 
                 spin(id, pid, behavior(postions), count)
-            :done -> 
+            :move -> 
                 Server.update(delta, id)
-                %Polar{r: r, theta: theta} = delta   
+                Server.relative_postions(id)
                 spin(id, pid, {}, count + 1)
             :shutdown ->
                 Process.exit self, "shutdown message received" 
@@ -73,19 +86,20 @@ defmodule Nektar.Cog do
 
     @doc """
         the curve function takes a list of PolarCoordinates and outputs
-        the new angle(relative) angle that the cog will go 
+        the new angle(relative) angle that the cog will go, if list is empty
+        returns zero 
     """
     def curve(polar_list) do
         curve(polar_list, [], [])
     end
     
     #attraction
-    defp curve([pc = %Polar{r: r} | polar_list], a_acc, r_acc) when r >= @x do
+    defp curve([pc = %Polar{r: r} | polar_list], a_acc, r_acc) when r > @x do
         curve(polar_list, [pc] ++ a_acc, r_acc)
     end
 
     #repulsion 
-    defp curve([pc = %Polar{r: r} | polar_list], a_acc, r_acc) when r < @x and r > 0 do
+    defp curve([pc = %Polar{r: r} | polar_list], a_acc, r_acc) when r <= @x and r > 0 do
         curve(polar_list, a_acc, [pc] ++ r_acc)
     end
 
@@ -112,8 +126,5 @@ defmodule Nektar.Cog do
         
         Polar.add(a_vector, r_vector)
         |>Polar.angle
-
     end 
-
- 
 end

@@ -14,38 +14,38 @@ defmodule Nektar.CogServer do
         {:reply, cog_list, {cog_list, count, size, num_done}}
     end
 
-    @doc """
-        this function takes the id of a Cog, updates it's postion with
-        the delta value and sends back the other postions of the cogs
-        around it
-        TODO: seprate the update from sending new postions so that this only happens after all updates are done   
-    """
     def handle_call({:update, id, delta}, _from, {cog_list, count, size, num_done}) do
-         #can this be more efficent, I am going through the whole list to update on postion,
-         #the relative_polarcoordinate function goes through this same list and returns
-         #all the other cogs, the cog list is than made into a relative polarcoodinates
-         #in the relative coordinates function, this prolly can be moved to this module maybe?
-         #either way we are going through the same list 3 times, it only needs to happen once 
-         {new_cog_list, cog} = Enum.map_reduce(cog_list, {}, fn(is_cog?, acc) -> 
-                            case is_cog? do
+        new_cog_list = Enum.map(cog_list, fn(is_cog?) -> 
+                            case cog = is_cog? do
                                 %Cog{id: this_id} when this_id == id -> 
-                                    {Cog.update_postion(is_cog?, delta), Cog.update_postion(is_cog?, delta)}
-                                _-> {is_cog?, acc}
+                                    :ets.insert(:history, {"cog#{cog.id}", "id: #{cog.id} \t count: #{count} \t x: #{cog.x} \t y: #{cog.y} \t angle: #{cog.theta} \t delta: #{inspect(delta)}\n"})
+                                    Cog.update_postion(is_cog?, delta)
+                                _-> is_cog?
                             end
                         end)
-            #sending cog others postion after it's own postion is updated            
-            rc = relative_polarcoordinates(new_cog_list, cog)
-            send cog.pid, {:new, rc}
-
-            #store cog in ets table
-            :ets.insert(:history, {"cog#{cog.id}", "id: #{cog.id} \t count: #{count} \t x: #{cog.x} \t y: #{cog.y} \t angle: #{cog.theta} \t delta: #{inspect(delta)} \t others: #{inspect(rc)}\n"})
-            {:reply, [], {new_cog_list, count, size, num_done}}
+        {:reply, [], {new_cog_list, count, size, num_done}}
     end
 
-    def handle_call(:sync, _from, {cog_list, count, size, num_done}) do
-         if size == num_done + 1 do
-                Enum.each(cog_list, fn(cog = %Cog{}) -> send cog.pid, :done end)
-                {:reply, [], {cog_list, count + 1, size, 0}}
+    def handle_call({:relative_polarcoordinates, id}, _from, {cog_list, count, size, num_done}) do
+        cog = Enum.find(cog_list, fn(%Cog{id: id_match?}) -> id_match?==id end)
+        send cog.pid, {:new_postions, relative_polarcoordinates(cog_list, cog)}
+
+        if size == num_done + 1 do
+            Enum.each(cog_list, fn(cog = %Cog{}) -> 
+                send cog.pid, :move 
+            end)
+
+             if count < 100 do
+                    {:ok, file} = File.open "history/#{count}points.csv", [:write]
+                    
+                     point_str = Enum.reduce(cog_list, "\"X\",Y\"\n",
+                                    fn (%Cog{x: x, y: y}, acc) -> acc<>"#{x},#{y}\n"
+                            end)
+            
+                    IO.binwrite file, point_str
+            end
+
+            {:reply, [], {cog_list, count + 1, size, 0}}
         else
             {:reply, [], {cog_list, count, size, num_done + 1}}
         end
@@ -57,7 +57,7 @@ defmodule Nektar.CogServer do
 
         1..number_of_cogs
         |>Enum.each(fn(n) -> 
-                        Cog.init(pid, n, 0, n)
+                        Cog.init(pid, n, n*4, n*7)  #pid, id, x, y
                         |>add_cog
                     end)
         
@@ -68,7 +68,7 @@ defmodule Nektar.CogServer do
        
         Enum.each(list, 
                   fn(cog) -> 
-                        send cog.pid, {:new, relative_polarcoordinates(list, cog)}
+                        relative_postions(cog.id)
                   end)
     end
 
@@ -113,8 +113,9 @@ defmodule Nektar.CogServer do
         GenServer.call(@name, {:update, id, delta})
     end
 
-    def sync do
-        GenServer.call(@name, :sync)
+
+    def relative_postions(id) do
+        GenServer.call(@name, {:relative_polarcoordinates, id})
     end
 
     def write_to_file do
@@ -128,7 +129,7 @@ defmodule Nektar.CogServer do
     end
 
     def cog_history do
-        {:ok, file} = File.open "history.txt", [:write]
+        {:ok, file} = File.open "history/history.txt", [:write]
         ets_list = Enum.reduce(list, [],
                         fn(%Cog{id: id}, acc) -> 
                             acc++[:ets.lookup(:history, "cog#{id}")] 
@@ -143,10 +144,9 @@ defmodule Nektar.CogServer do
 end
 
 #:TODO 
-#1. fix cogs swarm behavior, something is wrong with how angles are being applied, 2 cogs will drift apart, this should not happen
-            #I think sync is off, one is moving, the other than moves, but not based on the current postion of the other
-            #maybe the old way that I had was better?
-#2. figure out how to make behaviors more flexable ..
-#3. think how to represent the space they will acutally be in 
-#4. Environment
-#5. distrubed like gameOfLife example?
+
+#1. figure out how to make behaviors more flexable ..
+#2. think how to represent the space they will acutally be in 
+#3. Environment
+#4. distrubed like gameOfLife example?
+#5. make javascript 'viewer'
