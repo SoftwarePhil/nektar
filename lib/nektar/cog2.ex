@@ -1,6 +1,6 @@
-defmodule Nektar.Cog do
+defmodule Nektar.Cog2 do
     alias Nektar.PolarCoordinate, as: Polar
-    alias Nektar.CogServer, as: Server
+    alias Nektar.CogServer2, as: Server
     @enforce_keys [:id, :x, :y, :theta, :state, :pid]
     defstruct [:id, :x, :y, :theta, :state, :pid]
     require IEx
