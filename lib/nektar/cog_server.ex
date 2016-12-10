@@ -6,54 +6,59 @@ defmodule Nektar.CogServer do
 
     require IEx
 
-    def handle_call({:add_cog, cog = %Cog{}}, _from , {cog_list, count, size, num_done}) do
-        {:reply, :ok, {[cog | cog_list], count, size + 1, num_done}}
+    def handle_call({:add_cog, cog = %Cog{}}, _from, {cog_list, count, size, num_done}) do
+        send cog.pid, :link
+        {:reply, :ok, {Map.put(cog_list, cog.id, cog), count, size + 1, num_done}}
     end
 
     def handle_call(:list, _from, {cog_list, count, size, num_done}) do
         {:reply, cog_list, {cog_list, count, size, num_done}}
     end
 
-    def handle_call({:update, id, delta}, _from, {cog_list, count, size, num_done}) do
-        new_cog_list = Enum.map(cog_list, fn(is_cog?) -> 
-                            case cog = is_cog? do
-                                %Cog{id: this_id} when this_id == id -> 
-                                    :ets.insert(:history, {"cog#{cog.id}", "id: #{cog.id} \t count: #{count} \t x: #{cog.x} \t y: #{cog.y} \t angle: #{cog.theta} \t delta: #{inspect(delta)}\n"})
-                                    Cog.update_postion(is_cog?, delta)
-                                _-> is_cog?
-                            end
-                        end)
-        {:reply, [], {new_cog_list, count, size, num_done}}
-    end
-
-    def handle_call({:relative_polarcoordinates, id}, _from, {cog_list, count, size, num_done}) do
-        cog = Enum.find(cog_list, fn(%Cog{id: id_match?}) -> id_match?==id end)
+    def handle_cast({:relative_polarcoordinates, id}, {cog_list, count, size, num_done}) do
+        cog = Map.get(cog_list, id)
         send cog.pid, {:new_postions, relative_polarcoordinates(cog_list, cog)}
 
         if size == num_done + 1 do
-            Enum.each(cog_list, fn(cog = %Cog{}) -> 
+            Enum.each(cog_list, fn({_id, cog}) -> 
                 send cog.pid, :move 
             end)
 
-             if count < 100 do
+            if count < 100 do
                     {:ok, file} = File.open "history/#{count}points.csv", [:write]
                     
-                     point_str = Enum.reduce(cog_list, "\"X\",Y\"\n",
-                                    fn (%Cog{x: x, y: y}, acc) -> acc<>"#{x},#{y}\n"
+                     point_str = Enum.reduce(cog_list, "\"X\",\"Y\"\n",
+                                    fn ({_id, %Cog{x: x, y: y}}, acc) -> acc<>"#{x},#{y}\n"
                             end)
             
                     IO.binwrite file, point_str
             end
 
-            {:reply, [], {cog_list, count + 1, size, 0}}
+            {:noreply, {cog_list, count + 1, size, 0}}
         else
-            {:reply, [], {cog_list, count, size, num_done + 1}}
+            {:noreply, {cog_list, count, size, num_done + 1}}
         end
+    end
+
+    def handle_cast({:update, id, delta}, {cog_list, count, size, num_done}) do
+        cog = Map.get(cog_list, id)
+              |>Cog.update_postion(delta)
+
+        cog_map = Map.update!(cog_list, id, fn _ -> cog end)
+
+        :ets.insert(:history, {"cog#{cog.id}", "id: #{cog.id} \t count: #{count} \t x: #{cog.x} \t y: #{cog.y} \t angle: #{cog.theta} \t delta: #{inspect(delta)}\n"}) 
+                     
+        {:noreply, {cog_map, count, size, num_done}}
+    end
+
+    def handle_info(msg, state) do
+        IO.puts "error: #{msg}"
+        {:noreply, state}
     end
 
     def start_link(number_of_cogs) do
         :ets.new(:history, [:duplicate_bag, :public, :named_table])
-        {:ok, pid} = GenServer.start_link(__MODULE__, {[], 0, 0, 0}, name: @name)
+        {:ok, pid} = GenServer.start_link(__MODULE__, {Map.new, 0, 0, 0}, name: @name)
 
         1..number_of_cogs
         |>Enum.each(fn(n) -> 
@@ -66,11 +71,12 @@ defmodule Nektar.CogServer do
         #it is sending it's own positon thought, maybe this is okay because
         #there postion is 0,0
        
-        Enum.each(list, 
-                  fn(cog) -> 
+      Enum.each(list, 
+                  fn({_id, cog}) -> 
                         relative_postions(cog.id)
                   end)
-        pid
+      
+      pid
     end
 
     @doc """
@@ -79,9 +85,9 @@ defmodule Nektar.CogServer do
         a cog for it to caculaute how much it is going to moveS
     """
      def relative_polarcoordinates(cog_list, cog) do
-        other_pos = Enum.reject(cog_list, 
-                        fn(%Cog{id: other_id}) -> cog.id == other_id end)
-                    |>Enum.map(fn(some_cog) -> Cog.postion(some_cog) end)
+        other_pos = Map.delete(cog_list, cog.id)
+                    |>Map.to_list
+                    |>Enum.map(fn({_id, some_cog}) -> Cog.postion(some_cog) end)
                     |>Polar.relative_coordinates({{cog.x, cog.y}, cog.theta})
         s = other_pos
         #IEx.pry
@@ -98,7 +104,7 @@ defmodule Nektar.CogServer do
 
     def count_runs do
         list
-        |>Enum.map(fn(cog = %Cog{}) ->
+        |>Enum.map(fn({_id, cog}) ->
                         my_pid = spawn(fn -> 
                                 receive do
                                     count->IO.puts count
@@ -109,19 +115,19 @@ defmodule Nektar.CogServer do
     end
 
     def update(delta, id) do
-        GenServer.call(@name, {:update, id, delta})
+        GenServer.cast(@name, {:update, id, delta})
     end
 
 
     def relative_postions(id) do
-        GenServer.call(@name, {:relative_polarcoordinates, id})
+        GenServer.cast(@name, {:relative_polarcoordinates, id})
     end
 
     def write_to_file do
         {:ok, file} = File.open "history/my_points.csv", [:write]
                     
         point_str = Enum.reduce(list, "\"X\",Y\"\n",
-                                    fn (%Cog{x: x, y: y}, acc) -> acc<>"#{x},#{y}\n"
+                                    fn ({_id, %Cog{x: x, y: y}}, acc) -> acc<>"#{x},#{y}\n"
                                 end)
             
         IO.binwrite file, point_str
@@ -130,7 +136,7 @@ defmodule Nektar.CogServer do
     def cog_history do
         {:ok, file} = File.open "history/history.txt", [:write]
         ets_list = Enum.reduce(list, [],
-                        fn(%Cog{id: id}, acc) -> 
+                        fn({id, _cog}, acc) -> 
                             acc++[:ets.lookup(:history, "cog#{id}")] 
                   end)
         
@@ -141,9 +147,8 @@ defmodule Nektar.CogServer do
         IO.binwrite file, str
     end
 end
-
+#Nektar.CogServer2.start_link 3
 #:TODO 
-#0. Make list of Cogs a hashDic or map so updates can be faster
     #0.1 maybe go back to using no sync? 
     #increase efficency by keeping all angles in raidans? 
 #1. figure out how to make behaviors more flexable ..
@@ -151,3 +156,9 @@ end
 #3. Environment
 #4. distrubed like gameOfLife example?
 #5. make javascript 'viewer'
+
+#CogServer 1 | 3 cogs | 30 sec | 119_766
+#CogServer 2 | 3 cogs | 30 sec | 140_786
+
+#CogServer 1 | 100 cogs | 30 sec | 1_175
+#CogServer 2 | 100 cogs | 30 sec | 1_267
