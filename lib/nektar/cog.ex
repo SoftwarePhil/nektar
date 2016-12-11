@@ -22,7 +22,6 @@ defmodule Nektar.Cog do
     @doc """
         takes a cog and a polar coordinate(representing the change in postions)
         and returns a cog with a new postion and angle
-
         TODO: think of new name for this function
     """
     def update_postion(cog = %__MODULE__{}, pc = %Polar{}) do
@@ -81,7 +80,6 @@ defmodule Nektar.Cog do
         relative postions of the other cogs around it, and a function
         that maps the polar coordinates to an angle.  It returns a polar
         coordinate with radius 1 and the new angle of the cog
-
         does not work right now as planned because curve does all
         the reducing right now
     """

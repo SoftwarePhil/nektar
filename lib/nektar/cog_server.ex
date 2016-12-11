@@ -6,16 +6,16 @@ defmodule Nektar.CogServer do
 
     require IEx
 
-    def handle_call({:add_cog, cog = %Cog{}}, _from, {cog_list, count, size, num_done}) do
+    def handle_call({:add_cog, cog = %Cog{}}, _from, {cog_list, count, size, num_done, run_n_times}) do
         send cog.pid, :link
-        {:reply, :ok, {Map.put(cog_list, cog.id, cog), count, size + 1, num_done}}
+        {:reply, :ok, {Map.put(cog_list, cog.id, cog), count, size + 1, num_done, run_n_times}}
     end
 
-    def handle_call(:list, _from, {cog_list, count, size, num_done}) do
-        {:reply, cog_list, {cog_list, count, size, num_done}}
+    def handle_call(:list, _from, {cog_list, count, size, num_done, run_n_times}) do
+        {:reply, cog_list, {cog_list, count, size, num_done, run_n_times}}
     end
 
-    def handle_cast({:relative_polarcoordinates, id}, {cog_list, count, size, num_done}) do
+    def handle_cast({:relative_polarcoordinates, id}, {cog_list, count, size, num_done, run_n_times}) do
         cog = Map.get(cog_list, id)
         send cog.pid, {:new_postions, relative_polarcoordinates(cog_list, cog)}
 
@@ -34,21 +34,26 @@ defmodule Nektar.CogServer do
                     IO.binwrite file, point_str
             end
 
-            {:noreply, {cog_list, count + 1, size, 0}}
+            {:noreply, {cog_list, count + 1, size, 0, run_n_times}}
         else
-            {:noreply, {cog_list, count, size, num_done + 1}}
+            {:noreply, {cog_list, count, size, num_done + 1, run_n_times}}
         end
     end
 
-    def handle_cast({:update, id, delta}, {cog_list, count, size, num_done}) do
+    def handle_cast({:update, id, delta}, {cog_list, count, size, num_done, run_n_times}) do
+        if count == run_n_times do
+            Enum.each(cog_list, fn {_id, cog} -> send cog.pid, :shutdown end)
+            {:stop, :normal, {num_done, cog_list}}
+        end
+        
         cog = Map.get(cog_list, id)
               |>Cog.update_postion(delta)
 
         cog_map = Map.update!(cog_list, id, fn _ -> cog end)
 
-        :ets.insert(:history, {"cog#{cog.id}", "id: #{cog.id} \t count: #{count} \t x: #{cog.x} \t y: #{cog.y} \t angle: #{cog.theta} \t delta: #{inspect(delta)}\n"}) 
+        #:ets.insert(:history, {"cog#{cog.id}", "id: #{cog.id} \t count: #{count} \t x: #{cog.x} \t y: #{cog.y} \t angle: #{cog.theta} \t delta: #{inspect(delta)}\n"}) 
                      
-        {:noreply, {cog_map, count, size, num_done}}
+        {:noreply, {cog_map, count, size, num_done, run_n_times}}
     end
 
     def handle_info(msg, state) do
@@ -56,9 +61,10 @@ defmodule Nektar.CogServer do
         {:noreply, state}
     end
 
-    def start_link(number_of_cogs) do
+    def start_link(number_of_cogs, run_n_times \\-1) do
         :ets.new(:history, [:duplicate_bag, :public, :named_table])
-        {:ok, pid} = GenServer.start_link(__MODULE__, {Map.new, 0, 0, 0}, name: @name)
+        {:ok, pid} = GenServer.start_link(__MODULE__, {Map.new, 0, 0, 0, run_n_times}, name: @name)
+        Process.flag(:trap_exit, true)
 
         1..number_of_cogs
         |>Enum.each(fn(n) -> 
@@ -77,6 +83,11 @@ defmodule Nektar.CogServer do
                   end)
       
       pid
+    end
+
+    def terminate(_reason, stats) do
+        IO.puts "Sim over #{stats}"
+        :ok
     end
 
     @doc """
@@ -126,7 +137,7 @@ defmodule Nektar.CogServer do
     def write_to_file do
         {:ok, file} = File.open "history/my_points.csv", [:write]
                     
-        point_str = Enum.reduce(list, "\"X\",Y\"\n",
+        point_str = Enum.reduce(list, "\"X\",\"Y\"\n",
                                     fn ({_id, %Cog{x: x, y: y}}, acc) -> acc<>"#{x},#{y}\n"
                                 end)
             
@@ -147,7 +158,7 @@ defmodule Nektar.CogServer do
         IO.binwrite file, str
     end
 end
-#Nektar.CogServer2.start_link 3
+#Nektar.CogServer.start_link 3
 #:TODO 
     #0.1 maybe go back to using no sync? 
     #increase efficency by keeping all angles in raidans? 
@@ -157,8 +168,8 @@ end
 #4. distrubed like gameOfLife example?
 #5. make javascript 'viewer'
 
-#CogServer 1 | 3 cogs | 30 sec | 119_766
-#CogServer 2 | 3 cogs | 30 sec | 140_786
 
-#CogServer 1 | 100 cogs | 30 sec | 1_175
-#CogServer 2 | 100 cogs | 30 sec | 1_267
+#CogServer | 3 cogs   | 30 sec | 140_786
+#CogServer | 100 cogs | 30 sec | 1_267
+
+#CogServer | 100 cogs | 30 sec | 1703 

@@ -8,9 +8,7 @@ defmodule Nektar.PolarCoordinate do
         This method will take a point, and return the angle
         between that point and the line (1,0), and the length
         of that line    
-
         {length, angle}
-
         This uses the fact that the angle between two vectors
         is acos((v1*v2)/length) where * is the dot product
     """
@@ -39,7 +37,6 @@ defmodule Nektar.PolarCoordinate do
 
     @doc """
         normalizes a vector, converts a given vector to a unit vector
-
         returns a tuple {{new_x, new_y}, length}
     """
     def normalize({x, y}) do
@@ -58,7 +55,6 @@ defmodule Nektar.PolarCoordinate do
     
     @doc """
         finds the relative postion of others, returns a polarcoordinate
-
     """
     def relative_coordinates(other_positions, {{x, y}, current_angle}) do
             Enum.map(other_positions, fn({other_x, other_y}) -> {other_x - x, other_y - y} end)
@@ -76,7 +72,6 @@ defmodule Nektar.PolarCoordinate do
 
     @doc """
         transforms a polarcoordinate to a cartesian coordinate
-
         iex> Nektar.PolarCoordinate.as_cartesian {1, 180}
         {0, -1.0}  
     """

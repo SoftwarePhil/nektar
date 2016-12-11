@@ -27,6 +27,6 @@ defmodule Nektar.Mixfile do
   #
   # Type "mix help deps" for more examples and options
   defp deps do
-    []
+   [{:exprof, "~> 0.2.0"}]
   end
 end
