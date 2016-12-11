@@ -1,3 +1,0 @@
-%{"eflame": {:git, "https://github.com/proger/eflame.git", "55f594153d03f41d8dbd6b6da7c784f93fa81345", []},
-  "exprintf": {:hex, :exprintf, "0.2.0", "6c97364c75ddb848d0d6142ea3d882567369fc60f0b88a009f41470cab068a56", [:mix], []},
-  "exprof": {:hex, :exprof, "0.2.0", "b03f50d0d33e2f18c8e047d9188ba765dc32daba0b553ed717a98a78561d5eaf", [:mix], [{:exprintf, "~> 0.1", [hex: :exprintf, optional: false]}]}}
