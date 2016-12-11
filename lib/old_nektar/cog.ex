@@ -1,6 +1,6 @@
-defmodule Nektar.Cog2 do
+defmodule OldNektar.Cog do
     alias Nektar.PolarCoordinate, as: Polar
-    alias Nektar.CogServer2, as: Server
+    alias OldNektar.CogServer, as: Server
     @enforce_keys [:id, :x, :y, :theta, :state, :pid]
     defstruct [:id, :x, :y, :theta, :state, :pid]
     require IEx
@@ -90,7 +90,7 @@ defmodule Nektar.Cog2 do
     end
 
     #swarm parameters
-    @l 0.999
+    @l 0.99
     @alpha 1 - @l
     @x :math.sqrt(@l/@alpha)
 

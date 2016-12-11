@@ -90,7 +90,7 @@ defmodule Nektar.Cog do
     end
 
     #swarm parameters
-    @l 0.999
+    @l 0.99
     @alpha 1 - @l
     @x :math.sqrt(@l/@alpha)
 

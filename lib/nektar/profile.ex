@@ -1,10 +1,10 @@
 defmodule Profile do
     import ExProf.Macro
-    alias Nektar.CogServer2, as: Server
+    alias OldNektar.CogServer, as: Server
 
     def go do
         profile do
-            run_sim(3, 10_000)
+            run_sim(20, 500)
         end
     end 
 
