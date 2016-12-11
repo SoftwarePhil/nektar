@@ -6,16 +6,21 @@ defmodule Nektar.CogServer2 do
 
     require IEx
 
-    def handle_call({:add_cog, cog = %Cog{}}, _from, {cog_list, count, size, num_done}) do
+    def handle_call({:add_cog, cog = %Cog{}}, _from, {cog_list, count, size, num_done, run_n_times}) do
         send cog.pid, :link
-        {:reply, :ok, {Map.put(cog_list, cog.id, cog), count, size + 1, num_done}}
+        {:reply, :ok, {Map.put(cog_list, cog.id, cog), count, size + 1, num_done, run_n_times}}
     end
 
-    def handle_call(:list, _from, {cog_list, count, size, num_done}) do
-        {:reply, cog_list, {cog_list, count, size, num_done}}
+    def handle_call(:list, _from, {cog_list, count, size, num_done, run_n_times}) do
+        {:reply, cog_list, {cog_list, count, size, num_done, run_n_times}}
     end
 
-    def handle_cast({:relative_polarcoordinates, id}, {cog_list, count, size, num_done}) do
+    def handle_cast({:relative_polarcoordinates, id}, {cog_list, count, size, num_done, run_n_times}) do
+        if count == run_n_times do
+            Enum.each(cog_list, fn {_id, cog} -> send cog.pid, :shutdown end)
+            {:stop, :normal, {num_done, cog_list}}
+        end
+        
         cog = Map.get(cog_list, id)
         send cog.pid, {:new_postions, relative_polarcoordinates(cog_list, cog)}
 
@@ -34,13 +39,13 @@ defmodule Nektar.CogServer2 do
                     IO.binwrite file, point_str
             end
 
-            {:noreply, {cog_list, count + 1, size, 0}}
+            {:noreply, {cog_list, count + 1, size, 0, run_n_times}}
         else
-            {:noreply, {cog_list, count, size, num_done + 1}}
+            {:noreply, {cog_list, count, size, num_done + 1, run_n_times}}
         end
     end
 
-    def handle_cast({:update, id, delta}, {cog_list, count, size, num_done}) do
+    def handle_cast({:update, id, delta}, {cog_list, count, size, num_done, run_n_times}) do
         cog = Map.get(cog_list, id)
               |>Cog.update_postion(delta)
 
@@ -48,7 +53,7 @@ defmodule Nektar.CogServer2 do
 
         :ets.insert(:history, {"cog#{cog.id}", "id: #{cog.id} \t count: #{count} \t x: #{cog.x} \t y: #{cog.y} \t angle: #{cog.theta} \t delta: #{inspect(delta)}\n"}) 
                      
-        {:noreply, {cog_map, count, size, num_done}}
+        {:noreply, {cog_map, count, size, num_done, run_n_times}}
     end
 
     def handle_info(msg, state) do
@@ -56,9 +61,10 @@ defmodule Nektar.CogServer2 do
         {:noreply, state}
     end
 
-    def start_link(number_of_cogs) do
+    def start_link(number_of_cogs, run_n_times \\ -1) do
         :ets.new(:history, [:duplicate_bag, :public, :named_table])
-        {:ok, pid} = GenServer.start_link(__MODULE__, {Map.new, 0, 0, 0}, name: @name)
+        {:ok, pid} = GenServer.start_link(__MODULE__, {Map.new, 0, 0, 0, run_n_times}, name: @name)
+        Process.flag(:trap_exit, true)
 
         1..number_of_cogs
         |>Enum.each(fn(n) -> 

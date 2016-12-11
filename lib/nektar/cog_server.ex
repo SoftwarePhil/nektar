@@ -6,15 +6,15 @@ defmodule Nektar.CogServer do
 
     require IEx
 
-    def handle_call({:add_cog, cog = %Cog{}}, _from , {cog_list, count, size, num_done}) do
-        {:reply, :ok, {[cog | cog_list], count, size + 1, num_done}}
+    def handle_call({:add_cog, cog = %Cog{}}, _from , {cog_list, count, size, num_done, run_n_times}) do
+        {:reply, :ok, {[cog | cog_list], count, size + 1, num_done, run_n_times}}
     end
 
-    def handle_call(:list, _from, {cog_list, count, size, num_done}) do
-        {:reply, cog_list, {cog_list, count, size, num_done}}
+    def handle_call(:list, _from, {cog_list, count, size, num_done, run_n_times}) do
+        {:reply, cog_list, {cog_list, count, size, num_done, run_n_times}}
     end
 
-    def handle_call({:update, id, delta}, _from, {cog_list, count, size, num_done}) do
+    def handle_call({:update, id, delta}, _from, {cog_list, count, size, num_done, run_n_times}) do
         new_cog_list = Enum.map(cog_list, fn(is_cog?) -> 
                             case cog = is_cog? do
                                 %Cog{id: this_id} when this_id == id -> 
@@ -23,10 +23,15 @@ defmodule Nektar.CogServer do
                                 _-> is_cog?
                             end
                         end)
-        {:reply, [], {new_cog_list, count, size, num_done}}
+        {:reply, [], {new_cog_list, count, size, num_done, run_n_times}}
     end
 
-    def handle_call({:relative_polarcoordinates, id}, _from, {cog_list, count, size, num_done}) do
+    def handle_call({:relative_polarcoordinates, id}, _from, {cog_list, count, size, num_done, run_n_times}) do
+        if count == run_n_times do
+            Enum.each(cog_list, fn {_id, cog} -> send cog.pid, :shutdown end)
+            {:stop, :normal, {num_done, cog_list}}
+        end
+        
         cog = Enum.find(cog_list, fn(%Cog{id: id_match?}) -> id_match?==id end)
         send cog.pid, {:new_postions, relative_polarcoordinates(cog_list, cog)}
 
@@ -45,15 +50,16 @@ defmodule Nektar.CogServer do
                     IO.binwrite file, point_str
             end
 
-            {:reply, [], {cog_list, count + 1, size, 0}}
+            {:reply, [], {cog_list, count + 1, size, 0, run_n_times}}
         else
-            {:reply, [], {cog_list, count, size, num_done + 1}}
+            {:reply, [], {cog_list, count, size, num_done + 1, run_n_times}}
         end
     end
 
-    def start_link(number_of_cogs) do
+    def start_link(number_of_cogs, run_n_times \\ -1) do
         :ets.new(:history, [:duplicate_bag, :public, :named_table])
-        {:ok, pid} = GenServer.start_link(__MODULE__, {[], 0, 0, 0}, name: @name)
+        {:ok, pid} = GenServer.start_link(__MODULE__, {[], 0, 0, 0, run_n_times}, name: @name)
+        Process.flag(:trap_exit, true)
 
         1..number_of_cogs
         |>Enum.each(fn(n) -> 
