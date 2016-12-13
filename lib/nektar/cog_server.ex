@@ -68,7 +68,7 @@ defmodule Nektar.CogServer do
 
         1..number_of_cogs
         |>Enum.each(fn(n) -> 
-                        Cog.init(pid, n, n*4, 0)  #pid, id, x, y
+                        Cog.init(pid, n, 0, n*7)  #pid, id, x, y
                         |>add_cog
                     end)
         
@@ -92,8 +92,8 @@ defmodule Nektar.CogServer do
     """
      def relative_polarcoordinates(cog_list, cog) do
         other_pos = Map.delete(cog_list, cog.id)
-                    |>Map.to_list
-                    |>Enum.map(fn({_id, some_cog}) -> Cog.postion(some_cog) end)
+                    |>Map.values
+                    |>Enum.map(fn(some_cog) -> Cog.postion(some_cog) end)
                     |>Polar.relative_coordinates({{cog.x, cog.y}, cog.theta})
         s = other_pos
         #IEx.pry
@@ -132,7 +132,7 @@ defmodule Nektar.CogServer do
     def write_to_file do
         {:ok, file} = File.open "history/my_points.csv", [:write]
                     
-        point_str = Enum.reduce(list, "\"X\",Y\"\n",
+        point_str = Enum.reduce(list, "\"X\",\"Y\"\n",
                                     fn ({_id, %Cog{x: x, y: y}}, acc) -> acc<>"#{x},#{y}\n"
                                 end)
             

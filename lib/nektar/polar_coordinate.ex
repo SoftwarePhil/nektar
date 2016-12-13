@@ -23,7 +23,7 @@ defmodule Nektar.PolarCoordinate do
     end
     
     def create_polarcoordinate({x, y}) do
-        {_, length} = normalize({x, y}) 
+        length = :math.sqrt((x*x) + (y*y))
         
         angle = :math.acos(y/length)
                 |>to_degrees
@@ -61,17 +61,16 @@ defmodule Nektar.PolarCoordinate do
 
     """
     def relative_coordinates(other_positions, {{x, y}, current_angle}) do
-            Enum.map(other_positions, fn({other_x, other_y}) -> {other_x - x, other_y - y} end)
-            |>Enum.map(fn(x_y)-> 
-                    pc = create_polarcoordinate(x_y)
+            Enum.map(other_positions, fn({other_x, other_y}) -> 
+                pc = create_polarcoordinate({other_x - x, other_y - y})
 
-                    angle = case pc.theta do
+                angle = case pc.theta do
                                 angle when  angle >= current_angle   ->  angle - current_angle
                                 angle                                ->  360 - (current_angle - angle)
                             end 
                     
-                    %__MODULE__{r: pc.r, theta: angle}
-                end)        
+                    %__MODULE__{r: pc.r, theta: angle} 
+            end)     
     end
 
     @doc """

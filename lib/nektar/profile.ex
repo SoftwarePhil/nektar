@@ -1,6 +1,6 @@
 defmodule Profile do
     import ExProf.Macro
-    alias OldNektar.CogServer, as: Server
+    alias Nektar.CogServer, as: Server
 
     def go do
         profile do
