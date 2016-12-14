@@ -1,8 +1,8 @@
 defmodule Nektar.Cog do
     alias Nektar.PolarCoordinate, as: Polar
-    alias Nektar.CogServer, as: Server
-    @enforce_keys [:id, :x, :y, :theta, :state, :pid]
-    defstruct [:id, :x, :y, :theta, :state, :pid]
+    #alias Nektar.CogServer, as: Server
+    @enforce_keys [:x, :y, :theta, :delta, :state, :pid]
+    defstruct [:x, :y, :theta, :delta, :state, :pid]
     require IEx
     
     @doc """
@@ -10,9 +10,8 @@ defmodule Nektar.Cog do
         takes in pid (the pid of the server), id (unique cog id), x (x position), y (y postion)
         CogServer will not always have global name
     """
-    def init(other_pid, id, x, y) do
-        pid = spawn(__MODULE__, :spin, [id, other_pid, {}])
-        %__MODULE__{id: id, x: x, y: y, theta: 0, state: [], pid: pid}
+    def init(other_pid, x, y) do
+        spawn(__MODULE__, :spin, [%__MODULE__{x: x, y: y, theta: 0, delta: %Polar{r: 1, theta: 90} ,state: [], pid: other_pid}])
     end
 
     def postion(%__MODULE__{x: x, y: y}) do
@@ -25,13 +24,13 @@ defmodule Nektar.Cog do
 
         TODO: think of new name for this function
     """
-    def update_postion(cog = %__MODULE__{}, pc = %Polar{}) do
+    def update_postion(cog = %__MODULE__{}) do
         
         #the new angle has to be converted into absolute terms ..
         #maybe this should happen sooner, ie we have on angle for its
         #'absolute angle', another for it's 'relative angle' and
         #another one for when we need to calculate the new direction
-       
+        pc = cog.delta
         stored_theta = 
             case {cog.theta, pc.theta} do
                 {current, delta} when current + delta > 360 -> (current + delta) - 360
@@ -50,29 +49,27 @@ defmodule Nektar.Cog do
         %__MODULE__{cog | x: cog.x + x, y: cog.y + y, theta: stored_theta}
     end
     
-    def spin(id, pid, delta, count \\0) do
+    def spin(%__MODULE__{} = cog, count \\0) do
         receive do
             {:count, sender} -> 
                 send sender, count
-                spin(id, pid, delta, count)
+                spin(cog, count)
             {:new_postions, postions} -> 
-                spin(id, pid, behavior(postions), count)
+                spin(%__MODULE__{cog | delta: behavior(postions)}, count)
             :move -> 
-                Server.update(delta, id)
-                Server.relative_postions(id)
-                spin(id, pid, {}, count + 1)
+                spin(update_postion(cog), count + 1)
             :info -> 
-                IO.inspect {id, pid, delta, count}
-                spin(id, pid, delta, count)
+                IO.inspect {cog, count}
+                spin(cog, count)
             :link -> 
-                IO.inspect {"linking", self,  "to", pid}
-                Process.link(pid)
-                spin(id, pid, delta, count)
+                IO.inspect {"linking", self,  "to", cog.pid}
+                Process.link(cog.pid)
+                spin(cog, count)
             :shutdown ->
                 Process.exit self, "shutdown message received"
             _ ->
                 IO.puts "empty nothing good" 
-                spin(id, pid, delta, count)
+                spin(cog, count)
         end
     end
 
@@ -138,3 +135,5 @@ defmodule Nektar.Cog do
         |>Polar.angle
     end 
 end
+##working on
+#send {pid, :new_postions}, [Nektar.PolarCoordinate.create_polarcoordinate({1,1}), Nektar.PolarCoordinate.create_polarcoordinate({6,2})]  

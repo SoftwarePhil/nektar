@@ -37,16 +37,6 @@ defmodule Nektar.PolarCoordinate do
         %__MODULE__{r: length, theta: final_angle}
     end
 
-    @doc """
-        normalizes a vector, converts a given vector to a unit vector
-
-        returns a tuple {{new_x, new_y}, length}
-    """
-    def normalize({x, y}) do
-        length = :math.sqrt(abs(x*x) + abs(y*y))
-
-        {{x/length, y/length}, length}
-    end
 #maybe just want everything in raidians ?
     def to_degrees(angle) do
         angle*180/:math.pi

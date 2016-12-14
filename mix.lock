@@ -1,2 +1,4 @@
-%{"exprintf": {:hex, :exprintf, "0.2.0", "6c97364c75ddb848d0d6142ea3d882567369fc60f0b88a009f41470cab068a56", [:mix], []},
-  "exprof": {:hex, :exprof, "0.2.0", "b03f50d0d33e2f18c8e047d9188ba765dc32daba0b553ed717a98a78561d5eaf", [:mix], [{:exprintf, "~> 0.1", [hex: :exprintf, optional: false]}]}}
+%{"earmark": {:hex, :earmark, "1.0.3", "89bdbaf2aca8bbb5c97d8b3b55c5dd0cff517ecc78d417e87f1d0982e514557b", [:mix], []},
+  "exprintf": {:hex, :exprintf, "0.2.0", "6c97364c75ddb848d0d6142ea3d882567369fc60f0b88a009f41470cab068a56", [:mix], []},
+  "exprof": {:hex, :exprof, "0.2.0", "b03f50d0d33e2f18c8e047d9188ba765dc32daba0b553ed717a98a78561d5eaf", [:mix], [{:exprintf, "~> 0.1", [hex: :exprintf, optional: false]}]},
+  "json": {:hex, :json, "1.0.0", "4824dadb01e14395f65e9d18da294d534326d7eed77996f3c22f74a9870179eb", [:mix], [{:earmark, ">= 0.0.0", [hex: :earmark, optional: false]}]}}
