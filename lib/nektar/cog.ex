@@ -1,21 +1,70 @@
 defmodule Nektar.Cog do
     alias Nektar.PolarCoordinate, as: Polar
+    alias Nektar.Behavior, as: Behavior
     #alias Nektar.CogServer, as: Server
-    @enforce_keys [:x, :y, :theta, :delta, :state, :pid]
-    defstruct [:x, :y, :theta, :delta, :state, :pid]
+    @enforce_keys [:x, :y, :theta, :delta, :state, :pid, :count]
+    defstruct [:x, :y, :theta, :delta, :state, :pid, :count]
     require IEx
+    use GenServer
     
     @doc """
         creates a new cog
         takes in pid (the pid of the server), id (unique cog id), x (x position), y (y postion)
         CogServer will not always have global name
     """
-    def init(other_pid, x, y) do
-        spawn(__MODULE__, :spin, [%__MODULE__{x: x, y: y, theta: 0, delta: %Polar{r: 1, theta: 90} ,state: [], pid: other_pid}])
+    def start_link(other_pid, x, y) do
+        #{:ok, spawn(__MODULE__, :spin, [%__MODULE__{x: x, y: y, theta: 0, delta: %Polar{r: 1, theta: 90} ,state: [], pid: other_pid}])}
+        GenServer.start_link(__MODULE__, [%__MODULE__{x: x, y: y, theta: 0, delta: %Polar{r: 1, theta: 90} ,state: [], pid: other_pid, count: 0}])
     end
-
+  
     def postion(%__MODULE__{x: x, y: y}) do
         {x, y}
+    end
+##
+    def count(pid) do
+        GenServer.call(pid, :count)
+    end
+
+    def new_postion(pid, postions) do
+        GenServer.call(pid, {:new_postions, postions})
+    end
+
+    def move(pid) do
+        GenServer.call(pid, :move)
+    end
+
+    def info(pid) do
+        GenServer.call(pid, :info)
+    end
+
+    def stop(pid) do
+        GenServer.call(pid, :stop)
+    end
+
+  ##
+
+    def handle_call(:count, _from, cog) do
+        {:reply, cog.count, cog}
+    end
+
+    def handle_call({:new_postions, postions}, _from, cog) do
+        delta = behavior(postions)
+        cog = %__MODULE__{cog | delta: delta}
+        {:reply, {:ok, delta}, cog}
+    end
+
+    def handle_call(:move, _from, cog) do
+        updated = update_postion(cog)
+        pos = {updated.x, updated.y}
+        {:reply, {:ok, pos}, updated}
+    end
+
+    def handle_call(:info, _from, cog) do
+        {:stop, cog, cog}
+    end
+
+    def handle_call(:stop, _from, cog) do
+        {:stop, :normal, :ok, cog}
     end
 
     @doc """
@@ -46,33 +95,9 @@ defmodule Nektar.Cog do
                     end
         {x, y} = Polar.as_cartesian_correct %Polar{pc | theta: new_theta}
         
-        %__MODULE__{cog | x: cog.x + x, y: cog.y + y, theta: stored_theta}
+        %__MODULE__{cog | x: cog.x + x, y: cog.y + y, theta: stored_theta, count: cog.count + 1}
     end
     
-    def spin(%__MODULE__{} = cog, count \\0) do
-        receive do
-            {:count, sender} -> 
-                send sender, count
-                spin(cog, count)
-            {:new_postions, postions} -> 
-                spin(%__MODULE__{cog | delta: behavior(postions)}, count)
-            :move -> 
-                spin(update_postion(cog), count + 1)
-            :info -> 
-                IO.inspect {cog, count}
-                spin(cog, count)
-            :link -> 
-                IO.inspect {"linking", self,  "to", cog.pid}
-                Process.link(cog.pid)
-                spin(cog, count)
-            :shutdown ->
-                Process.exit self, "shutdown message received"
-            _ ->
-                IO.puts "empty nothing good" 
-                spin(cog, count)
-        end
-    end
-
     @doc """
         this function takes a list of polar coordinates, which are the 
         relative postions of the other cogs around it, and a function
@@ -82,58 +107,10 @@ defmodule Nektar.Cog do
         does not work right now as planned because curve does all
         the reducing right now
     """
-    def behavior(postions, action \\&curve/1) do
+    def behavior(postions, action \\&Behavior.curve/1) do
         %Polar{r: 1, theta: action.(postions)}
     end
-
-    #swarm parameters
-    @l 0.99
-    @alpha 1 - @l
-    @x :math.sqrt(@l/@alpha)
-
-    @doc """
-        the curve function takes a list of PolarCoordinates and outputs
-        the new angle(relative) angle that the cog will go, if list is empty
-        returns zero 
-    """
-    def curve(polar_list) do
-        curve(polar_list, [], [])
-    end
-    
-    #attraction
-    defp curve([pc = %Polar{r: r} | polar_list], a_acc, r_acc) when r > @x do
-        curve(polar_list, [pc] ++ a_acc, r_acc)
-    end
-
-    #repulsion 
-    defp curve([pc = %Polar{r: r} | polar_list], a_acc, r_acc) when r <= @x and r > 0 do
-        curve(polar_list, a_acc, [pc] ++ r_acc)
-    end
-
-    #repulsion, 0 distance case
-    defp curve([%Polar{r: r} | polar_list], a_acc, r_acc) when r == 0 do
-        curve(polar_list, a_acc, [%Polar{r: 0.01, theta: Enum.random(0..359)}] ++ r_acc)
-    end
-
-    #apply curve based on r, get and get scalling value, this is a way of weighing the vectors
-    defp curve([], a_acc, r_acc) do
-        a_vector = a_acc
-                   |>Enum.reduce({0,0}, fn(pc = %Polar{}, acc) -> 
-                        a = @alpha/@l * :math.pow(pc.r - :math.sqrt(@x), 2)
-                        {x, y} = acc
-                        {x + (a * :math.sin(Polar.to_rad(pc.theta))), y + (a * :math.cos(Polar.to_rad(pc.theta)))}                     
-                    end)
-        
-        r_vector = r_acc
-                   |>Enum.reduce({0,0}, fn(pc = %Polar{}, acc) -> 
-                        r = -1/:math.pow(pc.r, 2)
-                        {x, y} = acc
-                        {x + (r * :math.sin(Polar.to_rad(pc.theta))), y + (r * :math.cos(Polar.to_rad(pc.theta)))}                     
-                    end)
-        
-        Polar.add(a_vector, r_vector)
-        |>Polar.angle
-    end 
 end
 ##working on
-#send {pid, :new_postions}, [Nektar.PolarCoordinate.create_polarcoordinate({1,1}), Nektar.PolarCoordinate.create_polarcoordinate({6,2})]  
+#pid = Nektar.Cog.init self(), 1,2
+#send pid, {:new_postions, [Nektar.PolarCoordinate.create_polarcoordinate({1,1}), Nektar.PolarCoordinate.create_polarcoordinate({6,2})]}  
