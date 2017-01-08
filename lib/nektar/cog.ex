@@ -66,7 +66,7 @@ defmodule Nektar.Cog do
                 spin(id, pid, delta, count)
             :link -> 
                 IO.inspect {"linking", self,  "to", pid}
-                Process.link(pid)
+                #Process.link(pid)
                 spin(id, pid, delta, count)
             :shutdown ->
                 Process.exit self, "shutdown message received"
