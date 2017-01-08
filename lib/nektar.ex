@@ -2,9 +2,9 @@ defmodule Nektar do
     use Application
 
     def start(_type, _args) do
-        {:ok, pid} = Nektar.ServerSupervisor.start_link 5
+        {:ok, pid} = Nektar.ServerSupervisor.start_link 20
         runner = spawn(__MODULE__, :run, [])
-        Enum.each 1.. 50_000, fn _ -> send runner, :go end
+        Enum.each 1.. 500, fn _ -> send runner, :go end
         {:ok, pid}
     end
 
