@@ -26,25 +26,19 @@ defmodule Nektar.PolarCoordinate do
         length = :math.sqrt((x*x) + (y*y))
         
         angle = :math.acos(y/length)
-                |>to_degrees
+    
         #above finds smallest angle, we want the 'whole' angle    
         final_angle =  case  {x, y} do
                         {x, y} when x >= 0 and y >= 0 -> angle       #{ x ,  y}
                         {x, y} when y <  0 and x >= 0 -> angle       #{ x , -y}
-                        {_, _}                        -> 360 - angle #{-x ,  y}
+                        {_, _}                        -> 2*:math.pi - angle #{-x ,  y}
                                                                      #{-x , -y}
                   end      
         %__MODULE__{r: length, theta: final_angle}
     end
 
 #maybe just want everything in raidians ?
-    def to_degrees(angle) do
-        angle*180/:math.pi
-    end
-
-    def to_rad(angle) do
-        angle*:math.pi/180
-    end
+ 
     
     @doc """
         finds the relative postion of others, returns a polarcoordinate
@@ -56,7 +50,7 @@ defmodule Nektar.PolarCoordinate do
 
                 angle = case pc.theta do
                                 angle when  angle >= current_angle   ->  angle - current_angle
-                                angle                                ->  360 - (current_angle - angle)
+                                angle                                ->  2*:math.pi - (current_angle - angle)
                             end 
                     
                     %__MODULE__{r: pc.r, theta: angle} 
@@ -70,8 +64,8 @@ defmodule Nektar.PolarCoordinate do
         {0, -1.0}  
     """
     def as_cartesian(pc = %Nektar.PolarCoordinate{}) do
-        x = pc.r*:math.sin(to_rad(pc.theta))
-        y = pc.r*:math.cos(to_rad(pc.theta))
+        x = pc.r*:math.sin(pc.theta)
+        y = pc.r*:math.cos(pc.theta)
         
         case {x, y} do
                 {x, _y} when abs(x) < 0.001  -> {0, y}
@@ -82,8 +76,8 @@ defmodule Nektar.PolarCoordinate do
 
     #why can't just use this correct one?
     def as_cartesian_correct(pc = %Nektar.PolarCoordinate{}) do
-    x = pc.r*:math.cos(to_rad(pc.theta))
-    y = pc.r*:math.sin(to_rad(pc.theta))
+    x = pc.r*:math.cos(pc.theta)
+    y = pc.r*:math.sin(pc.theta)
     
     case {x, y} do
             {x, _y} when abs(x) < 0.001  -> {0, y}

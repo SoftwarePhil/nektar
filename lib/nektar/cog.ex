@@ -32,6 +32,10 @@ defmodule Nektar.Cog do
     def stop(pid) do
         GenServer.call(pid, :stop)
     end
+
+    def info(pid) do
+        GenServer.call(pid, :info)
+    end
   ##
     def handle_call(:count, _from, cog) do
         {:reply, cog.count, cog}
@@ -50,6 +54,11 @@ defmodule Nektar.Cog do
     def handle_call(:state, _from, cog) do
         pid = cog.state
         {:reply, cog.mod.state(pid), cog}
+    end
+
+    def handle_call(:info, _from, cog) do
+        pid = cog.state
+        {:reply, cog.mod.info(pid), cog}
     end
 
     def handle_call(:stop, _from, cog) do

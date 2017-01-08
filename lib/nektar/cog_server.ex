@@ -32,6 +32,20 @@ defmodule Nektar.CogServer do
         end)
     end
 
+    def cog_info do
+        {cogs, _sup}  = pids()
+        {:ok, file} = File.open "history/my_points.csv", [:write]
+        list = Enum.map(cogs, fn(pid) -> 
+                    Cog.info(pid) 
+               end)
+
+        point_str = Enum.reduce(list, "\"X\",\"Y\",\"Theta\"\n",
+                                    fn ({x, y, theta}, acc) -> acc<>"#{x},#{y}, #{theta}\n"
+                                end)
+            
+        IO.binwrite file, point_str
+    end
+
     def pids do
         GenServer.call(__MODULE__, :get_pids)
     end
@@ -62,7 +76,7 @@ defmodule Nektar.CogServer do
         IO.inspect {sup, amount}
         IO.puts "building"
         Enum.map(0..amount, fn(x) ->
-                {:ok, pid} = Supervisor.start_child(sup, [self(), {Nektar.Behavior, {x, x}}])
+                {:ok, pid} = Supervisor.start_child(sup, [self(), {Nektar.Behavior, {x *3, 0}}])
                 pid
             end)
     end
